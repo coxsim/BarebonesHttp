@@ -200,7 +200,10 @@ class HttpClientConnection(selector: Selector,
       handleConnectionClosed(key)
     }
     else if (bytesRead > 0) {
+      requestBuffer.obj.flip()
       state = state.handleBytesRead(startPos = startPos, endPos = startPos + bytesRead)
+      // TODO: check if state is 'new' and reset buffer if so
+      requestBuffer.obj.flip()
     }
   }
 
@@ -236,16 +239,12 @@ class HttpClientConnection(selector: Selector,
     override def handleBytesRead(startPos: Int, endPos: Int): ReadingState = {
       @tailrec def loop(index: Int): ReadingState = {
         if (index < endPos) {
-
-//          val ch = requestBuffer.obj.get(index)
-//          print(ch.toChar)
-
           if (requestBuffer.obj.get(index) == '\n') {
-//            logger.debug("\\n")
-
             lineReader = lineReader.handleLine(startPos = lineStartPos, endPos = index-1)
 
-            awaitingCr.init(index+1)
+            // TODO: check if lineReader is 'new' request, if not, need additional buffer
+
+            awaitingCr.init(if (index+1 == requestBuffer.obj.limit) 0 else index+1)
             awaitingCr.handleBytesRead(index+1, endPos)
           }
           else loop(index + 1)
