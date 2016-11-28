@@ -14,6 +14,10 @@ trait Selectable {
 }
 
 class Logger {
+  def trace(message: String): Unit = {
+    print("[TRACE] ")
+    println(message)
+  }
   def debug(message: String): Unit = {
     print("[DEBUG] ")
     println(message)
@@ -179,7 +183,10 @@ class HttpClientConnection(selector: Selector,
   override def handleSelect(key: SelectionKey, selector: Selector): Unit = {
     val startPos = requestBuffer.obj.position
 
+    logger.trace(requestBuffer.obj.toString)
     val bytesRead = socketChannel.read(requestBuffer.obj)
+    logger.trace(s"handleSelect bytesRead = $bytesRead")
+
     if (bytesRead < 0) {
       handleConnectionClosed(key)
     }
@@ -187,7 +194,9 @@ class HttpClientConnection(selector: Selector,
       requestBuffer.obj.flip()
       state = state.handleBytesRead(startPos = startPos, endPos = startPos + bytesRead)
       // TODO: check if state is 'new' and reset buffer if so
-      requestBuffer.obj.flip()
+//      requestBuffer.obj.flip()
+
+      requestBuffer.obj.clear()
     }
   }
 
@@ -196,11 +205,14 @@ class HttpClientConnection(selector: Selector,
     def init(lineStartPos: Int): Unit = this.lineStartPos = lineStartPos
 
     override def handleBytesRead(startPos: Int, endPos: Int): ReadingState = {
+      logger.trace(s"handleBytesRead(startPos = $startPos, endPos = $endPos)")
+
       @tailrec def loop(index: Int): ReadingState = {
+
         if (index < endPos) {
 
-//          val ch = requestBuffer.obj.get(index)
-//          print(ch.toChar)
+          val ch = requestBuffer.obj.get(index)
+          print(ch.toChar)
 
           if (requestBuffer.obj.get(index) == '\r') {
 //            logger.debug("\\r")
@@ -223,6 +235,9 @@ class HttpClientConnection(selector: Selector,
     override def handleBytesRead(startPos: Int, endPos: Int): ReadingState = {
       @tailrec def loop(index: Int): ReadingState = {
         if (index < endPos) {
+
+          print(requestBuffer.obj.get(index).toChar)
+
           if (requestBuffer.obj.get(index) == '\n') {
             lineReader = lineReader.handleLine(startPos = lineStartPos, endPos = index-1)
 
@@ -360,6 +375,12 @@ class HttpClientConnection(selector: Selector,
 
 
   class ConnectionLogger {
+    def trace(message: String): Unit = {
+      print("[TRACE] ")
+      print(socketChannel.getRemoteAddress)
+      print(": ")
+      println(message)
+    }
     def debug(message: String): Unit = {
       print("[DEBUG] ")
       print(socketChannel.getRemoteAddress)
