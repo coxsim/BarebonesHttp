@@ -1,11 +1,13 @@
+import java.io.{File, RandomAccessFile}
 import java.net.{InetSocketAddress, SocketAddress}
 import java.nio.ByteBuffer
-import java.nio.channels.{SelectionKey, Selector, ServerSocketChannel, SocketChannel}
+import java.nio.channels._
 import java.util
 import java.util.concurrent.atomic.AtomicBoolean
 
 import scala.annotation.{switch, tailrec}
 import scala.collection.mutable
+import scala.util.control.NonFatal
 
 trait Selectable {
   def handleSelect(key: SelectionKey, selector: Selector): Unit
@@ -20,40 +22,33 @@ class Logger {
     print("[INFO] ")
     println(message)
   }
+  def error(message: String): Unit = {
+    print("[ERROR] ")
+    println(message)
+  }
+  def error(message: String, exception: Throwable): Unit = {
+    print("[ERROR] ")
+    println(message)
+    exception.printStackTrace()
+  }
 }
 trait Logging {
   lazy val logger = new Logger
 }
 
+
+
 object HttpServer {
   def main(args: Array[String]): Unit = {
-    val requestHandler = new RequestHandler {
-      override def handleRequest(httpRequest: HttpRequest, clientConnection: HttpClientConnection): Unit = {
-        println("*** handling request ***")
-        println(httpRequest.uri)
-        @tailrec def loop(h: Header): Unit = {
-          if (h != null) {
-            println(h)
-            loop(h.next)
-          }
-        }
-        loop(httpRequest.firstHeader)
-
-        val content = s"<html><body>Hello World! <pre>${httpRequest.uri}</pre></body></html>"
-
-        clientConnection.write("HTTP/1.1 200 OK\r\n")
-        clientConnection.write(s"Content-Length: ${content.length}\r\n")
-        clientConnection.write("\r\n")
-        clientConnection.write(content)
-      }
-    }
+    val handler = new ComplexRequestHandler
+    val requestHandler = handler
     val server = new HttpServer(Selector.open(), new InetSocketAddress(8080), requestHandler)
     server.run()
   }
 }
 
 class HttpServer(selector: Selector, listenSocketAddress: SocketAddress, requestHandler: RequestHandler) extends Logging {
-  private val objectPool = new ObjectPool[ByteBuffer](10, ByteBuffer.allocateDirect(1024))
+  private val bufferPool = new ObjectPool[ByteBuffer](10, ByteBuffer.allocateDirect(1024))
 
   private val serverSocketChannel = ServerSocketChannel.open()
 
@@ -77,10 +72,15 @@ class HttpServer(selector: Selector, listenSocketAddress: SocketAddress, request
             if (key.isAcceptable) {
               val socketChannel = serverSocketChannel.accept()
               logger.debug(s"Accepting connection from ${socketChannel.getRemoteAddress}")
-              new HttpClientConnection(selector, socketChannel, objectPool, requestHandler)
+              new HttpClientConnection(selector, socketChannel, bufferPool, requestHandler)
             }
             else {
-              key.attachment.asInstanceOf[Selectable].handleSelect(key, selector)
+              try {
+                key.attachment.asInstanceOf[Selectable].handleSelect(key, selector)
+              }
+              catch {
+                case NonFatal(e) => logger.error(s"Failed to handle select for channel ${key.channel}", e)
+              }
             }
           }
         }
@@ -92,23 +92,7 @@ class HttpServer(selector: Selector, listenSocketAddress: SocketAddress, request
   }
 }
 
-class ObjectPool[T](capacity: Int, factory: => T) {
-  class PooledObject(val obj: T) {
-    def release(): Unit = ObjectPool.this.release(PooledObject.this)
-  }
 
-  private val pool: util.Queue[PooledObject] = new util.ArrayDeque[PooledObject](capacity)
-  for (i <- 0 until capacity) pool.add(new PooledObject(factory))
-
-
-  def acquire(): PooledObject = {
-    val next = pool.poll()
-    if (next == null) new PooledObject(factory)
-    else next
-  }
-
-  private def release(item: PooledObject) = pool.add(item)
-}
 
 
 
@@ -155,7 +139,7 @@ class Header {
 }
 
 trait RequestHandler {
-  def handleRequest(httpRequest: HttpRequest, clientConnection: HttpClientConnection): Unit
+  def handleRequest(implicit httpRequest: HttpRequest, clientConnection: HttpClientConnection): Unit
 }
 
 class HttpClientConnection(selector: Selector,
@@ -360,6 +344,12 @@ class HttpClientConnection(selector: Selector,
   def write(outputBuffer: ByteBuffer): Boolean = {
     socketChannel.write(outputBuffer)
     !outputBuffer.hasRemaining
+  }
+
+  def transferFrom(fromChannel: FileChannel): Boolean = {
+    val fileSize = fromChannel.size
+    val bytesTransferred = fromChannel.transferTo(0, fileSize, socketChannel)
+    bytesTransferred < fileSize
   }
 
   def write(value: String): Boolean = write(ByteBuffer.wrap(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
