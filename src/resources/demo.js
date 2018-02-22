@@ -44,48 +44,6 @@ var App = React.createClass({
         );
     }
 });
-//var Result = React.createClass({
-//    render:function(){
-//        var result = this.props.result.map(function(result,index){
-//            return <ResultItem key={index} user={ result } />
-//            });
-//        return(
-//            <div>
-//                {result}
-//            </div>
-//
-//        );
-//    }
-//});
-//var ResultItem = React.createClass({
-//    render:function(){
-//        var camper = this.props.user;
-//        return(
-//                <div className="row">
-//                    <div className="col-md-12">
-//                        <table className="table table-bordered">
-//                            <thead>
-//                            <tr>
-//                                <th className="col-md-4">UserName</th>
-//                                <th >Points In Last 30 Days</th>
-//                                <th>Points All Time</th>
-//                            </tr>
-//                            </thead>
-//                            <tbody>
-//                            <tr >
-//                                <td>{camper.username}</td>
-//                                <td>{camper.recent}</td>
-//                                <td>{camper.alltime}</td>
-//                            </tr>
-//                            </tbody>
-//                        </table>
-//                    </div>
-//                </div>
-//
-//        );
-//    }
-//});
-
 
 var Result = React.createClass({
     render:function(){
