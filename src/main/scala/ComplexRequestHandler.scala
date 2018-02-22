@@ -8,11 +8,6 @@ import scala.collection.mutable
 class ComplexRequestHandler extends RequestHandler {
   def handleStatic(uriStart: Int)(implicit httpRequest: HttpRequest, clientConnection: HttpClientConnection): Unit = {
 
-    //        println("STATIC: ")
-    //        for (i <- uriStart until httpRequest.uriEnd) {
-    //          print(httpRequest.buffer.get(i).toChar)
-    //        }
-
     val sb = new mutable.StringBuilder(httpRequest.uriEnd - uriStart)
     for (i <- uriStart until httpRequest.uriEnd) {
       sb.append(httpRequest.buffer.get(i).toChar)
@@ -54,49 +49,27 @@ class ComplexRequestHandler extends RequestHandler {
   override def handleRequest(implicit httpRequest: HttpRequest, clientConnection: HttpClientConnection): Unit = {
     println("*** handling request ***")
     println(httpRequest.uri)
-    //        @tailrec def loop(h: Header): Unit = {
-    //          if (h != null) {
-    //            println(h)
-    //            loop(h.next)
-    //          }
-    //        }
-    //        loop(httpRequest.firstHeader)
 
-    // allocates
-    //        val uri = httpRequest.uri
-    //
-    //        uri match {
-    //
-    //        }
+    def m(index: Int)(next: (Char, Int) => Unit): Unit = next(httpRequest.buffer.get(index).toChar, index)
 
-    def m(index: Int, next: (Char, Int) => Unit): Unit = {
-      next(httpRequest.buffer.get(index).toChar, index)
-    }
-
-    m(httpRequest.uriStart, (char: Char, index: Int) => char match {
-      case '/' => m(index + 1, (char: Char, index: Int) => char match {
-        case 's' => m(index + 1, (char: Char, index: Int) => char match {
-          case 't' => m(index + 1, (char: Char, index: Int) => char match {
-            case 'a' => m(index + 1, (char: Char, index: Int) => char match {
-              case 't' => m(index + 1, (char: Char, index: Int) => char match {
-                case 'i' => m(index + 1, (char: Char, index: Int) => char match {
-                  case 'c' => m(index + 1, (char: Char, index: Int) => char match {
-                    case '/' => m(index + 1, (_, index) => {
-                      //                          println("STATIC: ")
-                      //                          for (i <- index until httpRequest.uriEnd) {
-                      //                            print(httpRequest.buffer.get(i))
-                      //                          }
-                      handleStatic(index)
-                    })
-                  })
-                })
-              })
-            })
-          })
-        })
+    m(httpRequest.uriStart) { (char, index) => char match {
+      case '/' => m(index + 1) { (char, index) => char match {
+        case 's' => m(index + 1) { (char, index) => char match {
+          case 't' => m(index + 1) { (char, index) => char match {
+            case 'a' => m(index + 1) { (char, index) => char match {
+              case 't' => m(index + 1) { (char, index) => char match {
+                case 'i' => m(index + 1) { (char, index) => char match {
+                  case 'c' => m(index + 1) { (char, index) => char match {
+                    case '/' => m(index + 1) { (_, index) => handleStatic(index) }
+                  } }
+                } }
+              } }
+            } }
+          } }
+        } }
         case _ => handleDynamic(index)
-      })
+      } }
       case _ => handleDynamic(index)
-    })
+    } }
   }
 }
