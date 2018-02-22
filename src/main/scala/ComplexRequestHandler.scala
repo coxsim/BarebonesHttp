@@ -67,9 +67,9 @@ class ComplexRequestHandler extends RequestHandler {
             } }
           } }
         } }
-        case _ => handleDynamic(index)
+        case _ => handleDynamic(httpRequest.uriStart)
       } }
-      case _ => handleDynamic(index)
+      case _ => handleDynamic(httpRequest.uriStart)
     } }
   }
 }
