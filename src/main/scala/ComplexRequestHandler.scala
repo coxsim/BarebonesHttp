@@ -34,7 +34,11 @@ class ComplexRequestHandler extends RequestHandler {
       clientConnection.write(s"Content-Length: ${fileChannel.size()}\r\n")
       clientConnection.write("\r\n")
       //        clientConnection.write(fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, fileChannel.size()))
-      clientConnection.transferFrom(fileChannel)
+
+      if (!clientConnection.transferFrom(fileChannel)) {
+        // TODO: need some form of continuation
+        println("Failed to write file!")
+      }
     }
   }
 
